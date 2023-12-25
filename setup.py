@@ -21,9 +21,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     author="S4tyendra",
     author_email="satya@devh.in",
-    url="https://github.com/s44tyendra/MultiFeatures",
+    url="https://github.com/S4tyendra/MultiFeatures",
     keywords=["Tools", "Python", "12"],
-    install_requires=["dotmap", "aiohttp", "aiofiles"],
+    install_requires=["requests"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
