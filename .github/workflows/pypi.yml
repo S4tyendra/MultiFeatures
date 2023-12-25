@@ -9,7 +9,7 @@ on:
     branches:
       - main
     paths:
-      - "SafoneAPI/__init__.py"
+      - "MultiFeatures/__init__.py"
 
 jobs:
   deploy:
