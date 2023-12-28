@@ -26,4 +26,4 @@ from .ixigo import *
 from .redrail import *
 from .whereismytrain import *
 
-__version__ = "1.0.00"
+__version__ = "1.0.01"
