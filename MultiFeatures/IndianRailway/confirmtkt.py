@@ -60,7 +60,6 @@ class Confirmtkt:
             'User-Agent': 'okhttp/4.9.2',
         } if notSecured else self.headers
         resp = requests.get(url + route, params=params, headers=headers, timeout=timeout)
-        print(resp.url)
         if resp.status_code != 200:
             raise HTTPErr(status_code=resp.status_code, error="Response status code is not 200, it is {}".format(
                 resp.status_code))
