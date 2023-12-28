@@ -1,6 +1,6 @@
 """
-MultiFeatures v1.0
-Copyright (c) 2023 S4tyendra
+SafoneAPI v1.0
+Copyright (c) 2023 AsmSafone
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,6 +21,36 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from .IndianRailway import Confirmtkt
+class BaseError(Exception):
+    message = "An error occurred"
 
-__version__ = "1.0.0"
+    def __init__(self, error=None):
+        self.success = False
+        self.error_message = error or self.message
+
+    def __str__(self):
+        return self.message
+
+
+class TimeoutError(BaseError):
+    message = "Request Timeout, Please try again later"
+
+
+class RateLimitExceeded(BaseError):
+    message = "Rate Limit Exceeded, Please try again later"
+
+
+class InvalidRequest(BaseError):
+    message = "Invalid Request, Please read docs: https://api.safone.dev/redoc"
+
+
+class InvalidContent(BaseError):
+    message = "Invalid Content, Please report this: https://api.safone.dev/report"
+
+
+class GenericApiError(BaseError):
+    message = "Api Call Failed, Please report this: https://api.safone.dev/report"
+
+
+class ConnectionError(BaseError):
+    message = "Failed to communicate server, Please report this: https://api.safone.dev/report"

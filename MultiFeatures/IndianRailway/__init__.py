@@ -21,9 +21,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from .confirmtkt import Confirmtkt
+from .ixigo import *
 from .redrail import *
 from .whereismytrain import *
-from .confirmtkt import *
-from .ixigo import *
 
 __version__ = "1.0.00"
