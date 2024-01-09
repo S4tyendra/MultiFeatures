@@ -64,7 +64,8 @@ class RedRail:
 
         except requests.exceptions.RequestException as e:
             raise HTTPErr(error=str(e)) from e
-#
+
+    #
     def pnr_status(self, pnr: str, mobile: str = ""):
         """
         Gets the PNR status from the RedRail API.

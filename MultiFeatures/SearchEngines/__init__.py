@@ -3,4 +3,4 @@
 
 from .engines import *
 
-__version__ = "1.0.02"
+__version__ = "1.0.3"

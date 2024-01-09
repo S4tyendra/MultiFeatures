@@ -12,6 +12,7 @@ class BaseError(Exception):
 class NotAValidTrainNumber(BaseError):
     message = "Not a valid train number"
 
+
 class NotAValidStationCode(BaseError):
     message = "Not a valid Station Code"
 
