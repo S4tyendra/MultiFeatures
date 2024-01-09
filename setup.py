@@ -10,9 +10,12 @@ def read(file_name, extract_version=False):
         return re.search(r'__version__ = "(.*?)"', content).group(1)
     return content
 
-requirements = []
-with open('requirements.txt') as f:
-    requirements = f.readlines()
+requirements = ["requests[socks]>=2.22.0","beautifulsoup4>=4.10.0"]
+
+import os
+
+print(os.listdir("."))
+
 
 setuptools.setup(
     name="MultiFeatures",
