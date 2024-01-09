@@ -10,6 +10,9 @@ def read(file_name, extract_version=False):
         return re.search(r'__version__ = "(.*?)"', content).group(1)
     return content
 
+requirements = []
+with open('requirements.txt') as f:
+    requirements = f.readlines()
 
 setuptools.setup(
     name="MultiFeatures",
@@ -23,7 +26,7 @@ setuptools.setup(
     author_email="satya@devh.in",
     url="https://github.com/S4tyendra/MultiFeatures",
     keywords=["Tools", "Python", "12"],
-    install_requires=["requests"],
+    install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
