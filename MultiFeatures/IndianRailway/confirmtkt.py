@@ -1,10 +1,8 @@
 import secrets
-
-import requests
-
+import asyncio
+import aiohttp
 from MultiFeatures.IndianRailway.dataConfig import is_train_number_valid
 from MultiFeatures.IndianRailway.errors import HTTPErr, InternetUnreachable, NotAValidTrainNumber
-
 
 class Confirmtkt:
     """
@@ -38,7 +36,7 @@ class Confirmtkt:
         hex_string = secrets.token_hex(num_bytes)
         return hex_string
 
-    def _fetch(self, route, params, timeout=60, notSecured=False):
+    async def _fetch(self, route, params, timeout=60, notSecured=False):
         """
         Sends an HTTP GET request to the ConfirmTkt API.
 
@@ -59,13 +57,14 @@ class Confirmtkt:
             'Connection': 'Keep-Alive',
             'User-Agent': 'okhttp/4.9.2',
         } if notSecured else self.headers
-        resp = requests.get(url + route, params=params, headers=headers, timeout=timeout)
-        if resp.status_code != 200:
-            raise HTTPErr(status_code=resp.status_code, error="Response status code is not 200, it is {}".format(
-                resp.status_code))
-        return resp.json()
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url + route, params=params, timeout=timeout) as resp:
+                if resp.status != 200:
+                    raise HTTPErr(status_code=resp.status, error="Response status code is not 200, it is {}".format(
+                        resp.status))
+                return await resp.json()
 
-    def live_train_status(self, train_no: str, doj: str, locale: str = "en"):
+    async def live_train_status(self, train_no: str, doj: str, locale: str = "en"):
         """
         Gets the live status of a train from the ConfirmTkt API.
 
@@ -91,12 +90,12 @@ class Confirmtkt:
                 "locale": str(locale),
                 "session": self.generate_random_hex_string(),
             }
-            resp = self._fetch("api/trains/livestatusall", params=params, notSecured=True)
+            resp = await self._fetch("api/trains/livestatusall", params=params, notSecured=True)
             return resp
-        except requests.exceptions.ConnectionError:
+        except aiohttp.ClientError:
             raise InternetUnreachable
 
-    def train_monthlyavailability(self, src: str, dest: str, train_no: str, doj: str, locale: str = "en",
+    async def train_monthlyavailability(self, src: str, dest: str, train_no: str, doj: str, locale: str = "en",
                                   travelclasses: str = "1A,2A,3A,3E,SL", quota: str = "GN"):
         """
         Fetch monthly availability information for a specific train.
@@ -128,12 +127,12 @@ class Confirmtkt:
                 'locale': locale,
                 'session': self.generate_random_hex_string(),
             }
-            resp = self._fetch(f"api/trains/{train_no}/monthlyavailability", params=params)
+            resp = await self._fetch(f"api/trains/{train_no}/monthlyavailability", params=params)
             return resp
-        except requests.exceptions.ConnectionError:
+        except aiohttp.ClientError:
             raise InternetUnreachable
 
-    def available_trains(self, src: str, dest: str, doj: str, travelclass: str = "ZZ", passengerTrains: bool = True,
+    async def available_trains(self, src: str, dest: str, doj: str, travelclass: str = "ZZ", passengerTrains: bool = True,
                          showEcClass: bool = True, quota: str = "GN"):
         """
         Fetch available trains between two stations.
@@ -168,12 +167,12 @@ class Confirmtkt:
                 'showEcClass': True,
             }
 
-            resp = self._fetch("api/trains/latest", params=params)
+            resp = await self._fetch("api/trains/latest", params=params)
             return resp
-        except requests.exceptions.ConnectionError:
+        except aiohttp.ClientError:
             raise InternetUnreachable
 
-    def is_irctc_user_id_valid(self, user_id: str):
+    async def is_irctc_user_id_valid(self, user_id: str):
         """
         Checks if the provided IRCTC user ID is valid.
 
@@ -187,10 +186,10 @@ class Confirmtkt:
         params = {
             "userid": user_id,
         }
-        resp = self._fetch("api/platform/irctcregistration/checkuserid", params=params)
+        resp = await self._fetch("api/platform/irctcregistration/checkuserid", params=params)
         return False if resp.get('status') is None else True
 
-    def reset_irctc_account_password(self, user_id, contact_info, is_email=False):
+    async def reset_irctc_account_password(self, user_id, contact_info, is_email=False):
         """
         Reset the password of an IRCTC account. New password will be sent to the provided contact info.
 
@@ -215,7 +214,7 @@ class Confirmtkt:
             'phonenumber' if not is_email else 'email': contact_info,
         }
         try:
-            resp = self._fetch("api/platform/irctcregistration/changepassword", params=params)
+            resp = await self._fetch("api/platform/irctcregistration/changepassword", params=params)
             return resp
-        except requests.exceptions.ConnectionError:
+        except aiohttp.ClientError:
             raise InternetUnreachable

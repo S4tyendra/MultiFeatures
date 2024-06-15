@@ -10,7 +10,7 @@ def read(file_name, extract_version=False):
         return re.search(r'__version__ = "(.*?)"', content).group(1)
     return content
 
-requirements = ["requests[socks]>=2.22.0","beautifulsoup4>=4.10.0"]
+requirements = ["requests[socks]>=2.22.0","beautifulsoup4>=4.10.0","aiohttp>=3.9.5"]
 
 import os
 
