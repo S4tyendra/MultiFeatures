@@ -1,7 +1,6 @@
-import requests
-
+import aiohttp
+import asyncio
 from MultiFeatures.IndianRailway.errors import HTTPErr
-
 
 class RedRail:
     """
@@ -34,7 +33,7 @@ class RedRail:
             "User-Agent": "okhttp/4.11.0",
         }
 
-    def _fetch(self, url, method="GET", params=None, data=None, timeout=60):
+    async def _fetch(self, url, method="GET", params=None, data=None, timeout=60):
         """
         Sends an HTTP request to the RedRail API.
 
@@ -50,23 +49,24 @@ class RedRail:
         """
         url = self.base_url + url
         try:
-            if method == "GET":
-                response = requests.get(url, params=params, headers=self.headers, timeout=timeout)
-                print(response.url)
-            elif method == "POST":
-                response = requests.post(url, json=data, headers=self.headers, timeout=timeout)
-                print(response.url)
-            else:
-                raise ValueError("Invalid HTTP method")
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                if method == "GET":
+                    async with session.get(url, params=params, timeout=timeout) as response:
+                        print(response.url)
+                        response.raise_for_status()
+                        return await response.json()
+                elif method == "POST":
+                    async with session.post(url, json=data, timeout=timeout) as response:
+                        print(response.url)
+                        response.raise_for_status()
+                        return await response.json()
+                else:
+                    raise ValueError("Invalid HTTP method")
 
-            response.raise_for_status()  # Raise an exception for non-200 status codes
-            return response.json()
-
-        except requests.exceptions.RequestException as e:
+        except aiohttp.ClientError as e:
             raise HTTPErr(error=str(e)) from e
 
-    #
-    def pnr_status(self, pnr: str, mobile: str = ""):
+    async def pnr_status(self, pnr: str, mobile: str = ""):
         """
         Gets the PNR status from the RedRail API.
 
@@ -79,9 +79,9 @@ class RedRail:
         """
         url = "/api/Rails/v1/RIS/PnrToolkit"
         data = {"pnr": pnr, "mobile": mobile}
-        return self._fetch(url, method="POST", data=data)
+        return await self._fetch(url, method="POST", data=data)
 
-    def train_schedule(self, train_no: str):
+    async def train_schedule(self, train_no: str):
         """
         Gets the schedule for a train from the RedRail API.
 
@@ -92,9 +92,9 @@ class RedRail:
             dict: The JSON response containing train schedule information.
         """
         url = f"/api/Rails/v1/RIS/GetTrainSchedule/{train_no}"
-        return self._fetch(url)
+        return await self._fetch(url)
 
-    def coach_position(self, train_no: str, stn: str):
+    async def coach_position(self, train_no: str, stn: str):
         """
         Gets the coach position for a train at a station from the RedRail API.
 
@@ -106,9 +106,9 @@ class RedRail:
             dict: The JSON response containing coach position information.
         """
         url = f"/api/Rails/v1/RIS/GetCoachPosition?trainNo={train_no}&stn={stn}"
-        return self._fetch(url)
+        return await self._fetch(url)
 
-    def search_routes(self, src: str, dst: str, doj: str):
+    async def search_routes(self, src: str, dst: str, doj: str):
         """
         Searches for routes between two stations on a given date from the RedRail API.
 
@@ -122,9 +122,9 @@ class RedRail:
         """
         url = "/api/Rails/v1/Routes"
         data = {"dst": dst, "src": src, "sortLogic": 1, "doj": doj}
-        return self._fetch(url, method="POST", data=data)
+        return await self._fetch(url, method="POST", data=data)
 
-    def user_status(self, irctc_username: str):
+    async def user_status(self, irctc_username: str):
         """
         Gets the user status from the RedRail API.
 
@@ -135,9 +135,9 @@ class RedRail:
             dict: The JSON response containing user status information.
         """
         url = f"/api/Rails/v1/UserStatus/{irctc_username}"
-        return self._fetch(url)
+        return await self._fetch(url)
 
-    def get_live_train_status(self, train_no: str):
+    async def get_live_train_status(self, train_no: str):
         """
         Gets the live status of a train from the RedRail API.
 
@@ -149,4 +149,4 @@ class RedRail:
         """
         url = f"/api/Rails/v2/RIS/GetLiveTrainStatus/"
         params = {"trainNo": train_no}
-        return self._fetch(url, params=params)
+        return await self._fetch(url, params=params)
