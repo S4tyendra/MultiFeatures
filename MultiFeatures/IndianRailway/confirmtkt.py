@@ -1,16 +1,19 @@
 import secrets
-import asyncio
+import traceback
+
 import aiohttp
+
 from MultiFeatures.IndianRailway.dataConfig import is_train_number_valid
 from MultiFeatures.IndianRailway.errors import HTTPErr, InternetUnreachable, NotAValidTrainNumber
+
 
 class Confirmtkt:
     """
     A class for interacting with the ConfirmTkt API to get information.
 
     Attributes:
-        confirmtkt (str): The base URL for the ConfirmTkt API.
-        headers (dict): The headers to be included in the API requests.
+        _confirmtkt (str): The base URL for the ConfirmTkt API.
+        _headers (dict): The headers to be included in the API requests.
     """
 
     def __init__(self):
@@ -20,14 +23,14 @@ class Confirmtkt:
         Args:
             api (str): The base URL for the ConfirmTkt API.
         """
-        self.confirmtkt = "https://securedapi.confirmtkt.com/"
-        self.headers = {
+        self._confirmtkt = "https://securedapi.confirmtkt.com/"
+        self._headers = {
             'Host': 'securedapi.confirmtkt.com',
             'Connection': 'Keep-Alive',
             'User-Agent': 'okhttp/4.9.2',
         }
 
-    def generate_random_hex_string(self, length_: int = 32):
+    def _generate_random_hex_string(self, length_: int = 32):
         """Generate a random hexadecimal string of the specified length."""
         if length_ % 2 != 0:
             raise ValueError("Length should be an even number for a valid hexadecimal string.")
@@ -51,15 +54,20 @@ class Confirmtkt:
         Returns:
             dict: The JSON response from the API.
         """
-        url = "https://api.confirmtkt.com/" if notSecured else self.confirmtkt
+        url = "https://api.confirmtkt.com/" if notSecured else self._confirmtkt
         headers = {
             'Host': 'api.confirmtkt.com',
             'Connection': 'Keep-Alive',
             'User-Agent': 'okhttp/4.9.2',
-        } if notSecured else self.headers
+        } if notSecured else self._headers
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(url + route, params=params, timeout=timeout) as resp:
                 if resp.status != 200:
+                    print(await resp.text())
+                    print(resp.url)
+                    print(
+                        f"Response status code is not 200, it is {resp.status} for the url: {url + route} and params: {params}"
+                    )
                     raise HTTPErr(status_code=resp.status, error="Response status code is not 200, it is {}".format(
                         resp.status))
                 return await resp.json()
@@ -88,52 +96,15 @@ class Confirmtkt:
                 "trainno": str(train_no),
                 "doj": str(doj),
                 "locale": str(locale),
-                "session": self.generate_random_hex_string(),
+                "session": self._generate_random_hex_string(),
             }
             resp = await self._fetch("api/trains/livestatusall", params=params, notSecured=True)
             return resp
         except aiohttp.ClientError:
             raise InternetUnreachable
 
-    async def train_monthlyavailability(self, src: str, dest: str, train_no: str, doj: str, locale: str = "en",
-                                  travelclasses: str = "1A,2A,3A,3E,SL", quota: str = "GN"):
-        """
-        Fetch monthly availability information for a specific train.
+    async def available_trains(self, src: str, dest: str, doj: str, quota: str = "GN"):
 
-        Parameters:
-        - src (str): Source station code.
-        - dest (str): Destination station code.
-        - train_no (str): Train number.
-        - doj (str): Date of journey in the format 'dd-mm-yyyy'.
-        - locale (str): Locale for the response. Default is "en".
-        - travelclasses (str): Comma-separated list of travel classes. Default is "1A,2A,3A,3E,SL".
-        - quota (str): Quota for the availability check. Default is "GN".
-
-        Returns:
-        - dict: Monthly availability information for the specified train.
-
-        Raises:
-        - InternetUnreachable: If a connection error occurs during the API request.
-        - HTTPErr: If the response status code is not 200.
-
-        """
-        try:
-            params = {
-                "source": src,
-                "destination": dest,
-                "travelclasses": travelclasses,
-                "quota": quota,
-                'doj': doj,
-                'locale': locale,
-                'session': self.generate_random_hex_string(),
-            }
-            resp = await self._fetch(f"api/trains/{train_no}/monthlyavailability", params=params)
-            return resp
-        except aiohttp.ClientError:
-            raise InternetUnreachable
-
-    async def available_trains(self, src: str, dest: str, doj: str, travelclass: str = "ZZ", passengerTrains: bool = True,
-                         showEcClass: bool = True, quota: str = "GN"):
         """
         Fetch available trains between two stations.
 
@@ -158,19 +129,28 @@ class Confirmtkt:
         """
         try:
             params = {
-                'source': src,
-                'destination': dest,
+                'fromStnCode': src,
+                'destStnCode': dest,
                 'doj': doj,
-                'travelClass': travelclass,
                 'quota': quota,
-                'passengerTrains': passengerTrains,
-                'showEcClass': True,
+                'token': self._generate_random_hex_string(64),
+                'androidid': '',
+                'travelClassOrdering': 'ON,Ixigo',
+                'appVersion': '397',
+                'prevBookedTrains': 'OFF',
+                'noChancePercentage': 'true',
+                'getNearbyStation': 'true',
+                'session': self._generate_random_hex_string(32)
+
             }
 
-            resp = await self._fetch("api/trains/latest", params=params)
+            resp = await self._fetch("api/platform/trainbooking/tatwnstns", params=params)
             return resp
         except aiohttp.ClientError:
             raise InternetUnreachable
+        except Exception as e:
+            traceback.print_exc()
+            raise e
 
     async def is_irctc_user_id_valid(self, user_id: str):
         """
@@ -187,6 +167,7 @@ class Confirmtkt:
             "userid": user_id,
         }
         resp = await self._fetch("api/platform/irctcregistration/checkuserid", params=params)
+        print(resp)
         return False if resp.get('status') is None else True
 
     async def reset_irctc_account_password(self, user_id, contact_info, is_email=False):
@@ -218,3 +199,81 @@ class Confirmtkt:
             return resp
         except aiohttp.ClientError:
             raise InternetUnreachable
+        except Exception as e:
+            raise e
+
+    async def pnr_info(self, pnr: int):
+        """
+        Gets the PNR status from the ConfirmTkt API.
+
+        Args:
+            pnr (int): The PNR number.
+
+        Returns:
+            dict: The JSON response containing PNR status information.
+        """
+        if not isinstance(pnr, int):
+            raise ValueError("PNR number should be an integer.")
+        if len(str(pnr)) != 10:
+            raise ValueError("PNR number should be a 10-digit number.")
+        params = {
+            "session": self._generate_random_hex_string(),
+        }
+        try:
+            resp = await self._fetch(f"api/pnr/status/{pnr}", params=params, notSecured=True)
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e
+
+    async def train_search(self, train: str):
+        """
+        Search for a train by its number.
+
+        Args:
+            train (str): The train number.
+
+        Returns:
+            dict: The JSON response containing train information.
+        """
+        try:
+            params = {
+                "text": str(train),
+                "session": self._generate_random_hex_string(),
+            }
+            resp = await self._fetch("/api/trains/search", params=params, notSecured=True)
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e
+    async def train_schedule(self, train_no: int, date: str, locale: str = "en"):
+        """
+        Gets the schedule of a train from the ConfirmTkt API.
+
+        Args:
+            train_no (int): The train number.
+            date (str): The date for which the schedule is required.
+            locale (str, optional): The locale for the response. Defaults to 'en'.
+
+        Returns:
+            dict: The JSON response containing train schedule information.
+        """
+        if not isinstance(train_no, int):
+            raise ValueError("Train number should be an integer.")
+        if not is_train_number_valid(str(train_no)):
+            raise NotAValidTrainNumber
+        try:
+            params = {
+                "trainNo": str(train_no),
+                "date": date,
+                "locale": locale,
+                "session": self._generate_random_hex_string(),
+            }
+            resp = await self._fetch("api/trains/schedulewithintermediatestn", params=params, notSecured=True)
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e

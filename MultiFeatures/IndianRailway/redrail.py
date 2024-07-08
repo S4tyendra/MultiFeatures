@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 from MultiFeatures.IndianRailway.errors import HTTPErr
 
+
 class RedRail:
     """
     A class for interacting with the RedRail API to get information.
