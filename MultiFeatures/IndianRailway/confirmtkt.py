@@ -1,5 +1,6 @@
 import secrets
 import traceback
+from typing import Optional
 
 import aiohttp
 
@@ -23,6 +24,7 @@ class Confirmtkt:
         Args:
             api (str): The base URL for the ConfirmTkt API.
         """
+        self._config = None
         self._confirmtkt = "https://securedapi.confirmtkt.com/"
         self._headers = {
             'Host': 'securedapi.confirmtkt.com',
@@ -39,38 +41,31 @@ class Confirmtkt:
         hex_string = secrets.token_hex(num_bytes)
         return hex_string
 
-    async def _fetch(self, route, params, timeout=60, notSecured=False):
-        """
-        Sends an HTTP GET request to the ConfirmTkt API.
-
-        Args:
-            route (str): The API route to be appended to the base URL.
-            params (dict): The parameters to include in the request.
-            timeout (int): The maximum time to wait for the request to complete.
-
-        Raises:
-            HTTPErr: If the response status code is not 200.
-
-        Returns:
-            dict: The JSON response from the API.
-        """
+    async def _fetch(self, route, params, timeout=60, notSecured=False, method='get', data=None):
         url = "https://api.confirmtkt.com/" if notSecured else self._confirmtkt
         headers = {
             'Host': 'api.confirmtkt.com',
             'Connection': 'Keep-Alive',
             'User-Agent': 'okhttp/4.9.2',
         } if notSecured else self._headers
+
         async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(url + route, params=params, timeout=timeout) as resp:
-                if resp.status != 200:
-                    print(await resp.text())
-                    print(resp.url)
-                    print(
-                        f"Response status code is not 200, it is {resp.status} for the url: {url + route} and params: {params}"
-                    )
-                    raise HTTPErr(status_code=resp.status, error="Response status code is not 200, it is {}".format(
-                        resp.status))
-                return await resp.json()
+            if method.lower() == 'get':
+                async with session.get(url + route, params=params, timeout=timeout) as resp:
+                    if resp.status != 200:
+                        print(await resp.text())
+                        print(resp.url)
+                        print(f"Response status code is not 200, it is {resp.status} for the url: {url + route} and params: {params}")
+                        raise HTTPErr(status_code=resp.status, error=f"Response status code is not 200, it is {resp.status}")
+                    return await resp.json()
+            elif method.lower() == 'post':
+                async with session.post(url + route, params=params, json=data, timeout=timeout) as resp:
+                    if resp.status != 200:
+                        print(await resp.text())
+                        print(resp.url)
+                        print(f"Response status code is not 200, it is {resp.status} for the url: {url + route} and params: {params}")
+                        raise HTTPErr(status_code=resp.status, error=f"Response status code is not 200, it is {resp.status}")
+                    return await resp.json()
 
     async def live_train_status(self, train_no: str, doj: str, locale: str = "en"):
         """
@@ -272,6 +267,101 @@ class Confirmtkt:
                 "session": self._generate_random_hex_string(),
             }
             resp = await self._fetch("api/trains/schedulewithintermediatestn", params=params, notSecured=True)
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e
+
+    async def get_stations_list(self):
+        """
+        Get the list of stations from the ConfirmTkt API.
+
+        Returns:
+            dict: The JSON response containing the list of stations.
+        """
+        try:
+            params = {
+                "locale": "en",
+                "isCityMajorStationList": "true",
+                "session": self._generate_random_hex_string(),
+            }
+            resp = await self._fetch("api/platform/getStationList", params=params)
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e
+
+    async def send_otp(self, phone_number: str):
+        """
+        Send OTP to the provided phone number.
+
+        Args:
+            phone_number (str): The phone number without +91 to which the OTP will be sent.
+        """
+        if not phone_number.isdigit() or len(phone_number) != 10:
+            raise ValueError("Invalid phone number")
+        try:
+            params = {
+                "mobileNumber": phone_number,
+                "newOtp": "true",
+                "retry": "false",
+                "hashOtp": "true",
+                "fireBaseSMSvendor": "karix",
+                "locale": "en",
+                "channel": "Android",
+                "appVersion": "397"
+            }
+            resp = await self._fetch("api/platform/registerOutput", params=params)
+            if resp.get("Error"):
+                raise Exception(f"Error sending OTP: {resp['Error']}")
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e
+
+    async def verify_otp(self, phone_number: str, otp: str):
+        if not phone_number.isdigit() or len(phone_number) != 10:
+            raise ValueError("Invalid phone number")
+        try:
+            params = {
+                "mobileNumber": phone_number,
+                "otp": otp,
+                "locale": "en",
+                "channel": "Android",
+                "appVersion": "397"
+            }
+            resp = await self._fetch("api/platform/authenticatenew", params=params)
+            if not resp.get("authToken"):
+                raise Exception("Invalid OTP or authentication failed")
+            self._config['auth_token'] = resp['authToken']
+            return resp
+        except aiohttp.ClientError:
+            raise InternetUnreachable
+        except Exception as e:
+            raise e
+
+    async def smart_switch(self, from_station: str, to_station: str, date: str, train_type: Optional[str] = None,
+                           preferred_class: Optional[str] = None, token: Optional[str] = None):
+        try:
+            params = {"session": self._generate_random_hex_string()}
+            data = {
+                "AppVersion": "397",
+                "DestStnCode": to_station,
+                "Doj": date,
+                "FromStnCode": from_station,
+                "PlanFcfMax": "RO-F3FMAX",
+                "PlanZeroCan": "RO-F3",
+                "PreferredClass": preferred_class or "",
+                "Quota": "GN",
+                "Token": token or self._config.get('auth_token'),
+                "TrainType": train_type or "",
+            }
+            resp = await self._fetch("api/platform/trainbooking/smartswitch", params=params, method='post', data=data)
+            if resp.get("error"):
+                raise Exception(f"Smart switch error: {resp['error']}")
             return resp
         except aiohttp.ClientError:
             raise InternetUnreachable
